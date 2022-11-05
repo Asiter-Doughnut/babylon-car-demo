@@ -3,6 +3,9 @@ import * as BABYLON from '@babylonjs/core';
 import "@babylonjs/loaders";
 import { nextTick, onMounted, ref } from 'vue';
 const mycanvas = ref<HTMLCanvasElement>();
+
+type c = number extends number ? true : false;
+
 onMounted(() => {
   if (mycanvas.value) {
     const engine = new BABYLON.Engine(mycanvas.value, true, {
@@ -39,10 +42,12 @@ onMounted(() => {
         Wheel_Back_R = scene.getMeshById('Wheel_Back_R');
         carBody = scene.getMeshById("__root__");
 
-        pivot = new BABYLON.Mesh("pivot", scene); //current centre of rotation
+        // pivot = new BABYLON.Mesh("pivot", scene); //current centre of rotation
+        pivot = BABYLON.MeshBuilder.CreateBox("box4", { size: 0.8 }, scene);
         pivot.position.z = carBody!.getPositionExpressedInLocalSpace().z;
         carBody!.parent = pivot;
         carBody!.position = new BABYLON.Vector3(0, 0, 0);
+        pivot.showBoundingBox = true;
 
         /*-------------------Pivots for Front Wheels-----------------------------------*/
         const pivotFI = new BABYLON.Mesh("pivotFI", scene)
@@ -77,7 +82,7 @@ onMounted(() => {
         let D = 0;
         let bD = 0;
         let r = 0.35; // 车轮大小 radius
-        let L = 0.1;
+        let L = 0.9;
         let A = 0;
         let R = 2; //旋转
         let psi, psiRI, psiRO, psiFI, psiFO; //wheel rotations  
@@ -121,7 +126,7 @@ onMounted(() => {
 
           const distance = D / F;
           const BackDistance = -bD / F;
-          const psi = D / (r * F);
+          psi = D / (r * F);
           const bpsi = bD / (r * F);
           if ((keyboardMap["a"] || keyboardMap["A"]) && theta < Math.PI / 10) {
             deltaTheta = +Math.PI / 252;
@@ -136,8 +141,8 @@ onMounted(() => {
               theta = 0;
               NR = 0;
             }
-            pivot!.translate(BABYLON.Axis.Z, NR - R, BABYLON.Space.LOCAL);
-            carBody!.translate(BABYLON.Axis.Z, R - NR, BABYLON.Space.LOCAL);
+            pivot!.translate(BABYLON.Axis.X, NR - R, BABYLON.Space.LOCAL);
+            // carBody!.translate(BABYLON.Axis.X, R - NR, BABYLON.Space.LOCAL);
             R = NR;
           };
 
@@ -154,8 +159,8 @@ onMounted(() => {
               theta = 0;
               NR = 0;
             }
-            pivot!.translate(BABYLON.Axis.Z, NR - R, BABYLON.Space.LOCAL);
-            carBody!.translate(BABYLON.Axis.Z, R - NR, BABYLON.Space.LOCAL);
+            pivot!.translate(BABYLON.Axis.X, NR - R, BABYLON.Space.LOCAL);
+            // carBody!.translate(BABYLON.Axis.X, R - NR, BABYLON.Space.LOCAL);
             R = NR;
           };
           //前进  
@@ -172,7 +177,7 @@ onMounted(() => {
               Wheel_L?.rotate(BABYLON.Axis.X, psiFI, BABYLON.Space.LOCAL);
               Wheel_R?.rotate(BABYLON.Axis.X, psiFO, BABYLON.Space.LOCAL);
               Wheel_Back_L?.rotate(BABYLON.Axis.X, psiRI, BABYLON.Space.LOCAL);
-              Wheel_Back_R?.rotate(BABYLON.Axis.X, psiFO, BABYLON.Space.LOCAL);
+              Wheel_Back_R?.rotate(BABYLON.Axis.X, psiRO, BABYLON.Space.LOCAL);
             } else {
               carBody!.translate(BABYLON.Axis.Z, distance, BABYLON.Space.LOCAL);
               Wheel_L?.rotate(BABYLON.Axis.X, psi, BABYLON.Space.LOCAL);
