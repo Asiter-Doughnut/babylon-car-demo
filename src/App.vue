@@ -3,9 +3,6 @@ import * as BABYLON from '@babylonjs/core';
 import "@babylonjs/loaders";
 import { nextTick, onMounted, ref } from 'vue';
 const mycanvas = ref<HTMLCanvasElement>();
-
-type c = number extends number ? true : false;
-
 onMounted(() => {
   if (mycanvas.value) {
     const engine = new BABYLON.Engine(mycanvas.value, true, {
@@ -20,9 +17,19 @@ onMounted(() => {
       // add skyBox
       scene.environmentTexture = BABYLON.CubeTexture.CreateFromPrefilteredData('/environment.dds', scene);
       scene.createDefaultSkybox(scene.environmentTexture);
+      // Skybox
+      // const skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, scene);
+      // const skyboxMaterial = new BABYLON.StandardMaterial("skyBox", scene);
+      // skyboxMaterial.backFaceCulling = false;
+      // skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("/skybox", scene);
+      // skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+      // skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
+      // skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+      // skybox.material = skyboxMaterial;
 
       //camera
       const camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 3, Math.PI / 3, 10, BABYLON.Vector3.Zero(), scene);
+      // const camera = new BABYLON.FollowCamera("FollowCam", new BABYLON.Vector3(0, 10, -10), scene);
       camera.attachControl(true)
 
       // add _root_ to boody
@@ -34,6 +41,19 @@ onMounted(() => {
       let Wheel_Back_L: BABYLON.AbstractMesh | null;
       let Wheel_Back_R: BABYLON.AbstractMesh | null;
 
+      // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+      const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+
+      // Ground
+      const ground = BABYLON.MeshBuilder.CreateGround("ground", { height: 500, width: 500, subdivisions: 4 }, scene);
+      const groundMaterial = new BABYLON.StandardMaterial("groundMaterial", scene);
+      groundMaterial.diffuseTexture = new BABYLON.Texture("https://playground.babylonjs.com/textures/wood.jpg", scene);
+      (groundMaterial.diffuseTexture as any).uScale = 30;
+      (groundMaterial.diffuseTexture as any).vScale = 30;
+      groundMaterial.specularColor = new BABYLON.Color3(.1, .1, .1);
+      ground.material = groundMaterial;
+
       BABYLON.SceneLoader.Append("/", "./lamborghini1.glb", scene, (scene) => {
 
         Wheel_L = scene.getMeshById('Wheel_L');
@@ -42,12 +62,15 @@ onMounted(() => {
         Wheel_Back_R = scene.getMeshById('Wheel_Back_R');
         carBody = scene.getMeshById("__root__");
 
-        // pivot = new BABYLON.Mesh("pivot", scene); //current centre of rotation
-        pivot = BABYLON.MeshBuilder.CreateBox("box4", { size: 0.8 }, scene);
+        camera.lockedTarget = carBody;
+        pivot = new BABYLON.Mesh("pivot", scene); //添加车身父节点
+
+
+        // pivot = BABYLON.MeshBuilder.CreateBox("box4", { size: 0.8 }, scene);
+        // pivot.showBoundingBox = true; //边框大小
         pivot.position.z = carBody!.getPositionExpressedInLocalSpace().z;
         carBody!.parent = pivot;
         carBody!.position = new BABYLON.Vector3(0, 0, 0);
-        pivot.showBoundingBox = true;
 
         /*-------------------Pivots for Front Wheels-----------------------------------*/
         const pivotFI = new BABYLON.Mesh("pivotFI", scene)
@@ -82,43 +105,44 @@ onMounted(() => {
         let D = 0;
         let bD = 0;
         let r = 0.35; // 车轮大小 radius
-        let L = 0.9;
-        let A = 0;
-        let R = 2; //旋转
-        let psi, psiRI, psiRO, psiFI, psiFO; //wheel rotations  
+        let L = 1.6;
+        let A = 2.7;
+        let R = 0; //旋转
+        let psi, psiRI, psiRO, psiFI, psiFO; //车辆组
+        let NR; //车轮旋转角度
         scene.registerAfterRender(() => {
           const F = engine.getFps();
           //速度设置
           //前进
-          if ((keyboardMap["w"] || keyboardMap["W"]) && D < 15) {
+          if ((keyboardMap["w"] || keyboardMap["W"]) && D < 30) {
             if (bD > 0) {
-              bD -= 1;
+              bD -= 2;
               return;
             }
             else {
               bD = 0;
             }
-            D += 1;
+            D += 2;
           };
           if (D > 0.15 && bD == 0) {
-            D -= 0.15;
+            D -= 0.3;
           }
           else {
             D = 0;
           }
           // 后退
-          if ((keyboardMap["s"] || keyboardMap["S"]) && bD < 15) {
+          if ((keyboardMap["s"] || keyboardMap["S"]) && bD < 30) {
             if (D > 0) {
-              D -= 1;
+              D -= 2;
               return;
             }
             else {
               D = 0;
             }
-            bD += 1;
+            bD += 2;
           };
-          if (bD > 0.15 && D == 0) {
-            bD -= 0.15;
+          if (bD > 0.3 && D == 0) {
+            bD -= 0.3;
           }
           else {
             bD = 0;
@@ -126,32 +150,33 @@ onMounted(() => {
 
           const distance = D / F;
           const BackDistance = -bD / F;
-          psi = D / (r * F);
+          const psi = D / (r * F);
           const bpsi = bD / (r * F);
-          if ((keyboardMap["a"] || keyboardMap["A"]) && theta < Math.PI / 10) {
-            deltaTheta = +Math.PI / 252;
+          if ((keyboardMap["a"] || keyboardMap["A"]) && -Math.PI / 10 < theta) {
+            deltaTheta = -Math.PI / 360;
             theta += deltaTheta;
-            pivotFI.rotate(BABYLON.Axis.Y, deltaTheta, BABYLON.Space.LOCAL);
-            pivotFO.rotate(BABYLON.Axis.Y, deltaTheta, BABYLON.Space.LOCAL);
-            let NR;
+            pivotFI.rotate(BABYLON.Axis.Y, -deltaTheta, BABYLON.Space.LOCAL);
+            pivotFO.rotate(BABYLON.Axis.Y, -deltaTheta, BABYLON.Space.LOCAL);
+
             if (Math.abs(theta) > 0.00000001) {
+              console.log('L / Math.tan(theta)', L / Math.tan(theta));
               NR = A / 2 + L / Math.tan(theta);
             }
             else {
               theta = 0;
               NR = 0;
             }
-            pivot!.translate(BABYLON.Axis.X, NR - R, BABYLON.Space.LOCAL);
-            // carBody!.translate(BABYLON.Axis.X, R - NR, BABYLON.Space.LOCAL);
+            pivot!.translate(BABYLON.Axis.X, -R + NR, BABYLON.Space.LOCAL);
+            carBody!.translate(BABYLON.Axis.X, - R + NR, BABYLON.Space.LOCAL);
             R = NR;
           };
 
-          if ((keyboardMap["d"] || keyboardMap["D"]) && -Math.PI / 10 < theta) {
-            deltaTheta = -Math.PI / 252;
+          if ((keyboardMap["d"] || keyboardMap["D"]) && theta < Math.PI / 10) {
+            deltaTheta = Math.PI / 360;
             theta += deltaTheta;
-            pivotFI.rotate(BABYLON.Axis.Y, deltaTheta, BABYLON.Space.LOCAL);
-            pivotFO.rotate(BABYLON.Axis.Y, deltaTheta, BABYLON.Space.LOCAL);
-            let NR;
+            pivotFI.rotate(BABYLON.Axis.Y, -deltaTheta, BABYLON.Space.LOCAL);
+            pivotFO.rotate(BABYLON.Axis.Y, -deltaTheta, BABYLON.Space.LOCAL);
+
             if (Math.abs(theta) > 0.00000001) {
               NR = A / 2 + L / Math.tan(theta);
             }
@@ -159,13 +184,13 @@ onMounted(() => {
               theta = 0;
               NR = 0;
             }
-            pivot!.translate(BABYLON.Axis.X, NR - R, BABYLON.Space.LOCAL);
-            // carBody!.translate(BABYLON.Axis.X, R - NR, BABYLON.Space.LOCAL);
+            pivot!.translate(BABYLON.Axis.X, -R + NR, BABYLON.Space.LOCAL);
+            carBody!.translate(BABYLON.Axis.X, - R + NR, BABYLON.Space.LOCAL);
             R = NR;
           };
           //前进  
           if (D > 0) {
-            const phi = D / (r * F)
+            const phi = D / (R * F)
             if (Math.abs(theta) > 0) {
 
               pivot!.rotate(BABYLON.Axis.Y, phi, BABYLON.Space.WORLD);
@@ -174,12 +199,13 @@ onMounted(() => {
               psiFI = D * Math.sqrt(R * R + L * L) / (r * F);
               psiFO = D * Math.sqrt((R + A) * (R + A) + L * L) / (r * F);
 
-              Wheel_L?.rotate(BABYLON.Axis.X, psiFI, BABYLON.Space.LOCAL);
-              Wheel_R?.rotate(BABYLON.Axis.X, psiFO, BABYLON.Space.LOCAL);
-              Wheel_Back_L?.rotate(BABYLON.Axis.X, psiRI, BABYLON.Space.LOCAL);
-              Wheel_Back_R?.rotate(BABYLON.Axis.X, psiRO, BABYLON.Space.LOCAL);
+              Wheel_L?.rotate(BABYLON.Axis.X, psiRI, BABYLON.Space.LOCAL);
+              Wheel_R?.rotate(BABYLON.Axis.X, psiRO, BABYLON.Space.LOCAL);
+              Wheel_Back_L?.rotate(BABYLON.Axis.X, psiFI, BABYLON.Space.LOCAL);
+              Wheel_Back_R?.rotate(BABYLON.Axis.X, psiFO, BABYLON.Space.LOCAL);
             } else {
-              carBody!.translate(BABYLON.Axis.Z, distance, BABYLON.Space.LOCAL);
+              pivot!.translate(BABYLON.Axis.Z, distance, BABYLON.Space.LOCAL);
+              // carBody!.translate(BABYLON.Axis.Z, distance, BABYLON.Space.LOCAL);
               Wheel_L?.rotate(BABYLON.Axis.X, psi, BABYLON.Space.LOCAL);
               Wheel_R?.rotate(BABYLON.Axis.X, psi, BABYLON.Space.LOCAL);
               Wheel_Back_L?.rotate(BABYLON.Axis.X, psi, BABYLON.Space.LOCAL);
@@ -188,11 +214,32 @@ onMounted(() => {
 
           }
           if (bD > 0) {
-            carBody!.translate(BABYLON.Axis.Z, BackDistance, BABYLON.Space.LOCAL);
-            Wheel_L?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
-            Wheel_R?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
-            Wheel_Back_L?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
-            Wheel_Back_R?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
+            // // carBody!.translate(BABYLON.Axis.Z, BackDistance, BABYLON.Space.LOCAL);
+            // pivot!.translate(BABYLON.Axis.Z, BackDistance, BABYLON.Space.LOCAL);
+            // Wheel_L?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
+            // Wheel_R?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
+            // Wheel_Back_L?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
+            // Wheel_Back_R?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
+            const phi = bD / (R * F)
+            if (Math.abs(theta) > 0) {
+              pivot!.rotate(BABYLON.Axis.Y, -phi, BABYLON.Space.WORLD);
+              psiRI = bD / (r * F);
+              psiRO = bD * (R + A) / (r * F);
+              psiFI = bD * Math.sqrt(R * R + L * L) / (r * F);
+              psiFO = bD * Math.sqrt((R + A) * (R + A) + L * L) / (r * F);
+
+              Wheel_L?.rotate(BABYLON.Axis.X, psiRI, BABYLON.Space.LOCAL);
+              Wheel_R?.rotate(BABYLON.Axis.X, psiRO, BABYLON.Space.LOCAL);
+              Wheel_Back_L?.rotate(BABYLON.Axis.X, psiFI, BABYLON.Space.LOCAL);
+              Wheel_Back_R?.rotate(BABYLON.Axis.X, psiFO, BABYLON.Space.LOCAL);
+            } else {
+              pivot!.translate(BABYLON.Axis.Z, BackDistance, BABYLON.Space.LOCAL);
+              // carBody!.translate(BABYLON.Axis.Z, distance, BABYLON.Space.LOCAL);
+              Wheel_L?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
+              Wheel_R?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
+              Wheel_Back_L?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
+              Wheel_Back_R?.rotate(BABYLON.Axis.X, -bpsi, BABYLON.Space.LOCAL);
+            }
           }
         })
       });
